@@ -51,7 +51,7 @@ Get the list of all configuration presets held by LcdTap.
 - Response:
 
     ```json
-    {"presets": ["ILI9342", "ILI9488", "SSD1306", "SSD1331", "ST7735", "ST7789", "Arduboy", "M5Stack CoreS3", "Thumby", "TinyJoypad", "Xiamocon"]}
+    {"presets": ["ILI9342", "ILI9488", "SSD1306", "SSD1331", "ST7735", "ST7789", "Arduboy", "M5Stack CoreS3", "Thumby", "Tinyjoypad", "Xiamocon"]}
     ```
 
     - The list is derived from the firmware's `CONFIG_PRESET_NAMES` table and may change across firmware versions.

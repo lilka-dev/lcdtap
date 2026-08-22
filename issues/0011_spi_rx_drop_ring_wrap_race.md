@@ -9,7 +9,7 @@
 - Drop 発生の瞬間、RX Peak Backlog が**ちょうど 4096** (= リングワード数) になる。
   通常時の backlog は Arduboy で 12、CoreS3 で 260-270 程度。
 - RX HW Overflow = 0、TX Underrun = 0。物理的な取りこぼしはない。
-- I2C (TinyJoyPad, 15 kB/s) では発生しない。
+- I2C (Tinyjoypad, 15 kB/s) では発生しない。
 
 ## 原因
 
