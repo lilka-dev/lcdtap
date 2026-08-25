@@ -546,6 +546,10 @@ void getPresetConfig(ConfigPreset preset, LcdTapConfig* cfg) {
 
     case ConfigPreset::ESPBOY:
       getDefaultConfig(ControllerFamily::ST7789, cfg);
+      // ESPboy's panel is a non-inverted ST7735: the firmware sends INVOFF
+      // for the normal image (the ST7789 family default assumes INVON).
+      cfg->inverted = false;
+      cfg->swapRB = true;
       cfg->buffWidth = 136;
       cfg->buffHeight = 136;
       cfg->trimMode = TrimMode::CUSTOM;
