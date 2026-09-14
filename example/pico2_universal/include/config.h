@@ -58,6 +58,14 @@ static constexpr uint PIN_PAR_DATA_BASE = 3u;
 // D/C# signal (input, PIO IN_BASE+8 = GPIO 11)
 static constexpr uint PIN_PAR_DC = 11u;
 
+// Set to 1 when the parallel bus is fed by an external SPI→parallel adapter
+// whose latch strobe fires one SCLK before the byte boundary (the Lilka
+// LCD-TAP board: 74VHC4040 divider + 74HC595 shift register). Each capture
+// then holds seven bits of the current byte plus the last bit of the previous
+// one, and spiSlaveProcess() rebuilds the stream. Leave 0 for a host wired
+// directly to the parallel bus.
+#define LCDTAP_PAR_BIT_OFFSET_FIX 1
+
 // =============================================================================
 // Dual-chip-select parallel slave pins (parallel_2cs.pio, PIO1 SM0)
 //

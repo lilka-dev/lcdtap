@@ -560,6 +560,16 @@ void getPresetConfig(ConfigPreset preset, LcdTapConfig* cfg) {
       cfg->outputRotation = 2;
       break;
 
+    case ConfigPreset::LILKA:
+      getDefaultConfig(ControllerFamily::ST7789, cfg);
+      cfg->buffWidth = 280;
+      cfg->buffHeight = 240;
+      // The 007_LCD-TAP adapter converts Lilka's SPI stream to an 8-bit
+      // parallel bus in hardware (74HC595 shift register + 74VHC4040
+      // divider), so the RP2350 sees a parallel byte stream, not raw SPI.
+      cfg->busInterface = BusType::PARALLEL;
+      break;
+
     case ConfigPreset::PICOCALC:
       getDefaultConfig(ControllerFamily::ST7789, cfg);
       cfg->buffWidth = 320;

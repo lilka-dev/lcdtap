@@ -270,6 +270,10 @@ static void switchInterface(lcdtap::BusType newIface) {
     gBusCtx.parWrInvert =
         (cfg.controllerFamily == lcdtap::ControllerFamily::ST7032);
   }
+  // Only the parallel bus is reached through the shift-register adapter; the
+  // SPI and I2C inputs are wired to the host directly.
+  gSpi.bitOffsetFix = (LCDTAP_PAR_BIT_OFFSET_FIX != 0) &&
+                      (newIface == lcdtap::BusType::PARALLEL);
   // PARALLEL_2CS repurposes the RST pin as the CS1 input: keep the RST IRQ
   // off across the switch and restore the pin only when it is RST again.
   gpio_set_irq_enabled(PIN_RST, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, false);
