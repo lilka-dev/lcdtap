@@ -1,5 +1,7 @@
 <p align="center"><img src="./image/logo.png" width="240"></p>
 
+FORK with fixes for dev board
+
 A library and its example design that receives LCD controller commands (via SPI or I2C)
 and outputs the framebuffer as a DVI-D signal.
 
