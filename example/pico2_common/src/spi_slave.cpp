@@ -212,45 +212,18 @@ void __not_in_flash_func(spiSlaveProcess)(SpiSlaveState *s) {
       return;
     }
 
-    // The reconstruction below needs the successor of every word it fixes, so
-    // the newest captured word stays put until the next call.
-    if (s->bitOffsetFix && writeIdx != s->readIdx) {
-      writeIdx = (writeIdx - 1u) & (s->ringWords - 1u);
-    }
-
     const uint32_t iterStartIdx = s->readIdx;
-
-    // Hoisted out of the drain loop: at 6 MB/s it runs ~1.5 M times a second,
-    // so every avoided reload of a state field costs real headroom.
-    uint32_t *const ring = s->ringBuf;
-    const uint32_t mask = s->ringWords - 1u;
-    const bool fixBits = s->bitOffsetFix;
 
     uint32_t readIdx = s->readIdx;
     uint32_t dataStart = readIdx;
-    // Each reconstruction needs its successor, which is the next iteration's
-    // own word: carrying it over halves the loads the loop would otherwise do.
-    uint32_t cur = fixBits ? ring[readIdx] : 0u;
     while (readIdx != writeIdx) {
       uint32_t lastReadIdx = readIdx;
-      readIdx = (readIdx + 1u) & mask;
-      uint32_t word;
-
-      if (fixBits) {
-        // true[n] = (captured[n] << 1) | (captured[n + 1] >> 7). The write-back
-        // is what the zero-copy inputData() batch below reads. Only the data
-        // byte moves; the D/C bit arrives on a direct line already aligned.
-        const uint32_t nxt = ring[readIdx];
-        word = (cur & ~0xFFu) | ((cur << 1) & 0xFEu) | ((nxt & 0x80u) >> 7);
-        ring[lastReadIdx] = word;
-        cur = nxt;
-      } else {
-        word = ring[lastReadIdx];
-      }
+      uint32_t word = s->ringBuf[readIdx];
+      readIdx = (readIdx + 1u) & (s->ringWords - 1u);
 
       if (word & 0x100u) {
         if (readIdx == 0) {
-          s->inst->inputData((uint8_t *)&ring[dataStart],
+          s->inst->inputData((uint8_t *)&s->ringBuf[dataStart],
                              (s->ringWords - dataStart), sizeof(uint32_t));
           dataStart = 0;
           s->readIdx = readIdx;
@@ -258,7 +231,7 @@ void __not_in_flash_func(spiSlaveProcess)(SpiSlaveState *s) {
       } else {
         uint32_t dataLen = lastReadIdx - dataStart;
         if (dataLen != 0) {
-          s->inst->inputData((uint8_t *)&ring[dataStart], dataLen,
+          s->inst->inputData((uint8_t *)&s->ringBuf[dataStart], dataLen,
                              sizeof(uint32_t));
         }
         s->inst->inputCommand(static_cast<uint8_t>(word));
@@ -269,11 +242,11 @@ void __not_in_flash_func(spiSlaveProcess)(SpiSlaveState *s) {
 
     uint32_t dataLen = readIdx - dataStart;
     if (dataLen != 0) {
-      s->inst->inputData((uint8_t *)&ring[dataStart], dataLen,
+      s->inst->inputData((uint8_t *)&s->ringBuf[dataStart], dataLen,
                          sizeof(uint32_t));
     }
     s->readIdx = readIdx;
-    s->totalConsumedWords += (readIdx - iterStartIdx) & mask;
+    s->totalConsumedWords += (readIdx - iterStartIdx) & (s->ringWords - 1u);
   }
 }
 

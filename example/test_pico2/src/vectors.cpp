@@ -48,6 +48,7 @@ const TestVector TEST_VECTORS[] = {
     {"ILI9488_TrimC",  ConfigPreset::ILI9488,   BusType::SPI_4LINE, 320, 480, InterfaceFormat::RGB565_BE,             3, TrimMode::CUSTOM, TRIM_X, TRIM_Y, 160, 240},
     {"ILI9488_TrimA",  ConfigPreset::ILI9488,   BusType::SPI_4LINE, 320, 480, InterfaceFormat::RGB565_BE,             3, TrimMode::AUTO,   TRIM_X, TRIM_Y, 160, 240},
     {"ILI9488_Par8",   ConfigPreset::ILI9488,   BusType::PARALLEL, 320, 480, InterfaceFormat::RGB565_BE,             3, TrimMode::OFF,    0, 0, 0, 0},
+    {"LILKA_Par8",     ConfigPreset::LILKA,     BusType::PARALLEL, 240, 320, InterfaceFormat::RGB565_BE,             1, TrimMode::CUSTOM, 0, 20, 240, 280},
     {"TEXT_8x2",       ConfigPreset::TEXT_0802, BusType::I2C,   0,   0, FMT_NONE,                               0, TrimMode::OFF,    0, 0, 0, 0},
     {"TEXT_16x2",      ConfigPreset::TEXT_1602, BusType::I2C,   0,   0, FMT_NONE,                               0, TrimMode::OFF,    0, 0, 0, 0},
     {"TEXT_16x4",      ConfigPreset::TEXT_1604, BusType::I2C,   0,   0, FMT_NONE,                               0, TrimMode::OFF,    0, 0, 0, 0},
