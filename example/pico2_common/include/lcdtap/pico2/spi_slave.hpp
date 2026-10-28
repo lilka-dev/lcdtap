@@ -20,13 +20,6 @@ struct SpiSlaveConfig {
 struct SpiSlaveState {
   // Set by caller before spiSlaveProcess calls:
   lcdtap::LcdTap *inst;
-
-  // Adapters that rebuild the byte with an external shift register can latch
-  // one SCLK early, leaving each capture with seven bits of the current byte
-  // plus the last bit of the previous one. When set, spiSlaveProcess restores
-  // the stream as true[n] = (captured[n] << 1) | (captured[n + 1] >> 7), at
-  // the cost of one word of lookahead. Leave false for a directly wired bus.
-  bool bitOffsetFix;
   // Internal fields:
   SpiSlaveConfig cfg;
   uint32_t *ringBuf;

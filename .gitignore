@@ -26,3 +26,6 @@ _autosave-*
 # PlatformIO
 .pio/
 build_diag/
+
+# Local Pico SDK checkout
+pico-sdk/

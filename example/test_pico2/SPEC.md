@@ -132,7 +132,7 @@ is needed. There is no reset input in this mode.
 
 ## Test vectors
 
-33 built-in vectors plus the **ALL** entry (runs every vector, continues
+34 built-in vectors plus the **ALL** entry (runs every vector, continues
 on failure). Defaults use the "Fast" clock (third choice of each
 family/bus list: I2C 1 MHz, SPI 40 MHz, parallel 5 MHz — 10 kHz for
 character LCDs, 500 kHz for the dual-CS parallel bus). See
@@ -140,7 +140,7 @@ character LCDs, 500 kHz for the dual-CS parallel bus). See
 full table: SSD1306 (I2C rot 0–3, SPI), SSD1331 (RGB332 rot 0–3,
 RGB565, RGB666-RA), ST7789 (RGB444 rot 0–3, RGB565, RGB666-LA),
 ILI9341, ILI9488 (RGB111 rot 0–3, RGB565, RGB666-LA, trim CUSTOM/AUTO,
-parallel), ST7032 text presets (8x2/16x2/16x4/20x4 I2C, 20x4
+parallel), the Lilka preset (ST7789 240x320 GRAM, 240x280 trim, rot 1, RGB565, parallel), ST7032 text presets (8x2/16x2/16x4/20x4 I2C, 20x4
 parallel), and KS0108/KS0108 on the dual-CS parallel bus
 (`KS0108_P8C2` per-chip page streams; `KS0108_CsMix` alternates the
 cs mask per data byte with no commands in between, covering the bare

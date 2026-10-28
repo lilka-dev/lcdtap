@@ -562,8 +562,18 @@ void getPresetConfig(ConfigPreset preset, LcdTapConfig* cfg) {
 
     case ConfigPreset::LILKA:
       getDefaultConfig(ControllerFamily::ST7789, cfg);
-      cfg->buffWidth = 280;
-      cfg->buffHeight = 240;
+      // Lilka v2 drives a 240x280 panel through Arduino_GFX rotation 3
+      // (MADCTL MY|MV) with a 20-line GRAM offset, so the landscape image
+      // lands on physical rows 20..299 of the 240x320 GRAM. Keep the full
+      // GRAM, trim the visible window and rotate it back to landscape.
+      cfg->buffWidth = 240;
+      cfg->buffHeight = 320;
+      cfg->trimMode = TrimMode::CUSTOM;
+      cfg->trimX = 0;
+      cfg->trimY = 20;
+      cfg->trimWidth = 240;
+      cfg->trimHeight = 280;
+      cfg->outputRotation = 1;
       // The 007_LCD-TAP adapter converts Lilka's SPI stream to an 8-bit
       // parallel bus in hardware (74HC595 shift register + 74VHC4040
       // divider), so the RP2350 sees a parallel byte stream, not raw SPI.

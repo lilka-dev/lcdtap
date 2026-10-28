@@ -5,13 +5,14 @@
 // pico2_common json_intf.cpp getframebuffer does (fbIndexTrimmed walk ->
 // RGB565-RLE -> Base64, using the target's own rleEncodeSegment/b64Encode3),
 // and the stream is drained through FrameVerifier. Covers every interface
-// format, all four rotations, trim OFF/CUSTOM/AUTO, R/B swap and the
-// character LCD text path, plus a corruption negative test.
+// format, all four rotations, trim OFF/CUSTOM/AUTO, R/B swap, the
+// character LCD text path and the Lilka preset vector, plus a corruption
+// negative test.
 //
 // Build & run:
 //   g++ -O2 -Wall -Wextra -I../include -I../../../lib/include
 //       -I../../pico2_common/include -o /tmp/testrig_verify_test
-//       verify_test.cpp ../src/testgen.cpp ../src/verify.cpp
+//       verify_test.cpp ../src/testgen.cpp ../src/verify.cpp ../src/vectors.cpp
 //       ../../pico2_common/src/json_rle.cpp ../../pico2_common/src/json_b64.cpp
 //       ../../../lib/src/lcdtap.cpp ../../../lib/src/config.cpp
 //       ../../../lib/src/spi_display_base.cpp
@@ -39,6 +40,7 @@
 #include "lcdtap/lcdtap.hpp"
 #include "lcdtap/pico2/json_b64.hpp"
 #include "lcdtap/pico2/json_rle.hpp"
+#include "testrig/vectors.hpp"
 #include "testrig/verify.hpp"
 
 using namespace lcdtap;
@@ -561,6 +563,150 @@ static void testCorruptionDetected() {
         v.firstBadX(), v.firstBadY());
 }
 
+// ---------------------------------------------------------------------------
+// Lilka preset: the LILKA_Par8 vector end to end — preset config with the
+// executor's overrides, the rig's ST7789 init sequence, and pixel data
+// delivered as parallel capture ring words (stride 4, D/C in bit 8) in
+// FIFO-sized chunks, exactly as spiSlaveProcess hands them to the core.
+// ---------------------------------------------------------------------------
+static void testLilkaPreset() {
+  printf("testLilkaPreset\n");
+  const TestVector* vec = nullptr;
+  for (int i = 0; i < NUM_TEST_VECTORS; i++) {
+    if (TEST_VECTORS[i].preset == ConfigPreset::LILKA) vec = &TEST_VECTORS[i];
+  }
+  CHECK(vec != nullptr, "no LILKA vector in TEST_VECTORS");
+  if (vec == nullptr) return;
+  CHECK(vec->busInterface == BusType::PARALLEL, "LILKA vector bus %d",
+        (int)vec->busInterface);
+  CHECK(presetFamily(vec->preset) == ControllerFamily::ST7789,
+        "LILKA family mismatch");
+
+  for (uint8_t rot = 0; rot < 4; rot++) {
+    LcdTapConfig cfg;
+    getPresetConfig(vec->preset, &cfg);
+    CHECK(cfg.busInterface == BusType::PARALLEL, "preset bus %d",
+          (int)cfg.busInterface);
+    CHECK(cfg.buffWidth == vec->buffWidth && cfg.buffHeight == vec->buffHeight,
+          "preset geometry %ux%u", cfg.buffWidth, cfg.buffHeight);
+    // Executor overrides (overrideValue in executor.cpp).
+    cfg.busInterface = vec->busInterface;
+    cfg.buffWidth = vec->buffWidth;
+    cfg.buffHeight = vec->buffHeight;
+    cfg.trimMode = vec->trimMode;
+    cfg.trimX = vec->trimX;
+    cfg.trimY = vec->trimY;
+    cfg.trimWidth = vec->trimWidth;
+    cfg.trimHeight = vec->trimHeight;
+    cfg.flipMode = static_cast<FlipMode>(0);
+    cfg.forcePowerOn = false;
+    cfg.interfaceFormatOverride = -1;
+    cfg.outputRotation = rot;
+    Harness h(cfg);
+
+    const uint16_t w = vec->buffWidth;
+    const uint16_t ht = vec->buffHeight;
+    const uint16_t xe = static_cast<uint16_t>(w - 1);
+    const uint16_t ye = static_cast<uint16_t>(ht - 1);
+    // ctrlInitDisplay + ctrlBeginFrame (ST7789 branch)
+    h.cmd(st7789::CMD_SWRESET);
+    h.cmd(st7789::CMD_SLPOUT);
+    h.cmdData(st7789::CMD_COLMOD, {0x55});
+    h.cmdData(st7789::CMD_MADCTL, {0x00});
+    h.cmd(st7789::CMD_DISPON);
+    h.cmdData(st7789::CMD_CASET, {0, 0, (uint8_t)(xe >> 8), (uint8_t)xe});
+    h.cmdData(st7789::CMD_RASET, {0, 0, (uint8_t)(ye >> 8), (uint8_t)ye});
+    h.cmd(st7789::CMD_RAMWR);
+
+    PatternParams pat{vec->interfaceFormat, w, 0x7A11u + rot};
+    std::vector<uint8_t> wire(wireBytesForRect(vec->interfaceFormat, w, ht));
+    buildWireRect(pat, 0, 0, w, ht, wire.data());
+
+    // Parallel capture words: byte in bits[7:0], D/C=1 in bit 8. Chunk sizes
+    // vary so batches split pixels at odd byte offsets.
+    std::vector<uint32_t> words(wire.size());
+    for (size_t i = 0; i < wire.size(); i++) words[i] = 0x100u | wire[i];
+    static const size_t CHUNKS[] = {1, 7, 64, 333, 4096};
+    size_t ci = 0;
+    for (size_t i = 0; i < words.size();) {
+      size_t n = CHUNKS[ci++ % 5];
+      if (n > words.size() - i) n = words.size() - i;
+      h.tap.inputData(reinterpret_cast<const uint8_t*>(&words[i]),
+                      static_cast<uint32_t>(n), sizeof(uint32_t));
+      i += n;
+    }
+
+    char what[64];
+    snprintf(what, sizeof(what), "%s rot=%u", vec->name, rot);
+    runVerify(h.tap, pat, cfg.swapRB, what);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Lilka preset against Keira's real addressing: Arduino_GFX ST7789 rotation 3
+// (MADCTL MY|MV) on the 240x280 panel with a 20-line GRAM offset. The
+// getframebuffer output must be the 280x240 landscape image, upright.
+// ---------------------------------------------------------------------------
+static void testLilkaKeiraAddressing() {
+  printf("testLilkaKeiraAddressing\n");
+  constexpr uint16_t LW = 280, LH = 240, OFFSET = 20;
+  LcdTapConfig cfg;
+  getPresetConfig(ConfigPreset::LILKA, &cfg);
+  Harness h(cfg);
+  h.cmd(st7789::CMD_SWRESET);
+  h.cmd(st7789::CMD_SLPOUT);
+  h.cmdData(st7789::CMD_COLMOD, {0x55});
+  h.cmdData(st7789::CMD_MADCTL, {0xA0});  // MY | MV | RGB
+  h.cmd(st7789::CMD_INVON);
+  h.cmd(st7789::CMD_DISPON);
+  const uint16_t xe = OFFSET + LW - 1;
+  h.cmdData(st7789::CMD_CASET, {0, OFFSET, (uint8_t)(xe >> 8), (uint8_t)xe});
+  h.cmdData(st7789::CMD_RASET, {0, 0, 0, LH - 1});
+  h.cmd(st7789::CMD_RAMWR);
+
+  // Logical pixel value: the R/B channels carry x/y (5 bits each) and G the
+  // low 6 bits of x + y, so rotation and mirroring errors show up.
+  auto logical = [](uint16_t x, uint16_t y) -> uint16_t {
+    return static_cast<uint16_t>(((x & 0x1Fu) << 11) |
+                                 (((x + y) & 0x3Fu) << 5) | (y & 0x1Fu));
+  };
+  std::vector<uint8_t> wire;
+  wire.reserve((size_t)LW * LH * 2);
+  for (uint16_t y = 0; y < LH; y++) {
+    for (uint16_t x = 0; x < LW; x++) {
+      uint16_t v = logical(x, y);
+      wire.push_back(static_cast<uint8_t>(v >> 8));
+      wire.push_back(static_cast<uint8_t>(v));
+    }
+  }
+  h.data(wire.data(), wire.size());
+
+  // Walk the output exactly like getframebuffer (trim + outputRot).
+  LcdTapConfig cur = h.tap.getConfig();
+  uint16_t sx, sy, sw, sh;
+  h.tap.getOutSrcRegion(&sx, &sy, &sw, &sh);
+  uint8_t rot = cur.outputRotation & 3u;
+  uint16_t outW = (rot & 1u) ? sh : sw;
+  uint16_t outH = (rot & 1u) ? sw : sh;
+  CHECK(outW == LW && outH == LH, "Lilka output %ux%u, want %ux%u", outW, outH,
+        LW, LH);
+  if (outW != LW || outH != LH) return;
+  const uint16_t* fb = h.tap.getFramebuf();
+  const uint16_t inv = h.tap.isOutputInverted() ? 0xFFFFu : 0u;
+  uint32_t bad = 0;
+  for (uint16_t oy = 0; oy < outH; oy++) {
+    for (uint16_t ox = 0; ox < outW; ox++) {
+      uint16_t px =
+          fb[fbIndexTrimmed(ox, oy, sx, sy, sw, sh, cur.buffWidth, rot)] ^ inv;
+      if (px != logical(ox, oy) && bad++ == 0) {
+        CHECK(false, "Lilka output (%u,%u) = %04X, want %04X", ox, oy, px,
+              logical(ox, oy));
+      }
+    }
+  }
+  CHECK(bad == 0, "Lilka output: %u mismatching pixels", bad);
+}
+
 int main() {
   testSt7789Formats();
   testSt7789TrimCustom();
@@ -570,6 +716,8 @@ int main() {
   testSsd1306();
   testKs0108();
   testSt7032Text();
+  testLilkaPreset();
+  testLilkaKeiraAddressing();
   testCorruptionDetected();
   if (gFailures == 0) {
     printf("ALL TESTS PASSED\n");
