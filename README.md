@@ -9,6 +9,12 @@ and outputs the framebuffer as a DVI-D signal.
 
 See [introduction page](https://shapoco.github.io/lcdtap/).
 
+## Lilka (007_LCD-TAP)
+
+To mirror the [Lilka v2](https://docs.lilka.dev/) screen to HDMI with the 007_LCD-TAP board, see
+[LILKA.md](LILKA.md) ([українською](LILKA.uk.md)). In short: flash `pico2_universal`, load the
+**Lilka** preset, and set the Lilka display to **40 MHz, SPI_MODE3** in Keira.
+
 ## Implementations
 
 ### [LcdTap-Pico2 Universal](example/pico2_universal/)
